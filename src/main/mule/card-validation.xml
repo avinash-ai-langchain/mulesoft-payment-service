@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core">
+
+    <!-- ❌ BUG: ArrayIndexOutOfBoundsException in card validation -->
+    <flow name="validateCardFlow">
+        <set-variable variableName="cardParts" value="#[payload.cardNumber splitBy('-')]"/>
+        
+        <!-- BUG: Assumes card has 4 parts, doesn't validate array length -->
+        <logger level="INFO" message="Card part 1: #[vars.cardParts[0]]"/>
+        <logger level="INFO" message="Card part 2: #[vars.cardParts[1]]"/>
+        <logger level="INFO" message="Card part 3: #[vars.cardParts[2]]"/>
+        <logger level="INFO" message="Card part 4: #[vars.cardParts[3]]"/>
+    </flow>
+</mule>
