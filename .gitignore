@@ -1,0 +1,20 @@
+# MuleSoft
+target/
+.mule/
+.studio/
+*.zip
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Build
+*.class
+*.jar
+*.war
+
+# Logs
+logs/
+*.log
