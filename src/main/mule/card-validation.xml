@@ -2,14 +2,41 @@
 <mule xmlns="http://www.mulesoft.org/schema/mule/core"
       xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core">
 
-    <!-- ❌ BUG: ArrayIndexOutOfBoundsException in card validation -->
+    <!-- Fixed: defensively handle null/invalid card numbers and avoid unsafe array access -->
     <flow name="validateCardFlow">
-        <set-variable variableName="cardParts" value="#[payload.cardNumber splitBy('-')]"/>
-        
-        <!-- BUG: Assumes card has 4 parts, doesn't validate array length -->
-        <logger level="INFO" message="Card part 1: #[vars.cardParts[0]]"/>
-        <logger level="INFO" message="Card part 2: #[vars.cardParts[1]]"/>
-        <logger level="INFO" message="Card part 3: #[vars.cardParts[2]]"/>
-        <logger level="INFO" message="Card part 4: #[vars.cardParts[3]]"/>
+        <!-- Safely split cardNumber; default to empty string so splitBy never fails on null -->
+        <set-variable variableName="cardParts" value="#[(payload.cardNumber default '') splitBy('-')]"/>
+
+        <!-- Only log parts when the expected index exists to prevent ArrayIndexOutOfBoundsException -->
+        <choice>
+            <when expression="#[sizeOf(vars.cardParts) > 0]">
+                <logger level="INFO" message="Card part 1: #[vars.cardParts[0]]"/>
+            </when>
+        </choice>
+
+        <choice>
+            <when expression="#[sizeOf(vars.cardParts) > 1]">
+                <logger level="INFO" message="Card part 2: #[vars.cardParts[1]]"/>
+            </when>
+        </choice>
+
+        <choice>
+            <when expression="#[sizeOf(vars.cardParts) > 2]">
+                <logger level="INFO" message="Card part 3: #[vars.cardParts[2]]"/>
+            </when>
+        </choice>
+
+        <choice>
+            <when expression="#[sizeOf(vars.cardParts) > 3]">
+                <logger level="INFO" message="Card part 4: #[vars.cardParts[3]]"/>
+            </when>
+        </choice>
+
+        <!-- Log a warning when card number format is incomplete, while preserving flow compatibility -->
+        <choice>
+            <when expression="#[sizeOf(vars.cardParts) < 4]">
+                <logger level="WARN" message="Card number format is incomplete or invalid. Expected 4 parts separated by '-', received #[sizeOf(vars.cardParts)] part(s)."/>
+            </when>
+        </choice>
     </flow>
 </mule>
