@@ -4,24 +4,39 @@
       xmlns:db="http://www.mulesoft.org/schema/mule/db"
       xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core">
 
-    <!-- ❌ BUG: NullPointerException - customer object can be null -->
+    <!-- Fixed: guard against empty DB results before accessing customer fields -->
     <flow name="processPaymentFlow">
         <http:listener path="/api/payments" method="POST"/>
-        
+
+        <!-- Preserve the original request payload because db:select replaces payload with the query result -->
+        <set-variable variableName="paymentRequest" value="#[payload]"/>
+
         <db:select config-ref="Database_Config">
             <db:sql>SELECT * FROM customers WHERE id = :customerId</db:sql>
             <db:input-parameters>
-                <![CDATA[#[{customerId: payload.customerId}]]]>
+                <![CDATA[#[{customerId: vars.paymentRequest.customerId}]]]>
             </db:input-parameters>
         </db:select>
-        
-        <!-- BUG: Accessing customer.name without null check -->
-        <logger level="INFO" message="Processing payment for customer: #[payload[0].name]"/>
-        
-        <ee:transform>
-            <ee:message>
-                <ee:set-payload resource="dataweave/transform-payment-request.dwl"/>
-            </ee:message>
-        </ee:transform>
+
+        <!-- Safely validate the lookup result before dereferencing payload[0] -->
+        <choice>
+            <when expression="#[(payload default []) is Array and sizeOf(payload default []) > 0]">
+                <!-- Safe because the customer record existence is verified above -->
+                <logger level="INFO" message="Processing payment for customer: #[payload[0].name default 'UNKNOWN']"/>
+
+                <!-- Restore the original payment request so downstream transformation remains backward compatible -->
+                <set-payload value="#[vars.paymentRequest]"/>
+
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload resource="dataweave/transform-payment-request.dwl"/>
+                    </ee:message>
+                </ee:transform>
+            </when>
+            <otherwise>
+                <!-- Return a controlled client error instead of failing with NullPointerException -->
+                <raise-error type="VALIDATION:INVALID_INPUT" description="Customer not found for the provided customerId"/>
+            </otherwise>
+        </choice>
     </flow>
 </mule>
