@@ -4,24 +4,33 @@
       xmlns:db="http://www.mulesoft.org/schema/mule/db"
       xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core">
 
-    <!-- ❌ BUG: NullPointerException - customer object can be null -->
+    <!-- Fixed: handle empty DB result safely before accessing customer fields -->
     <flow name="processPaymentFlow">
         <http:listener path="/api/payments" method="POST"/>
-        
+
         <db:select config-ref="Database_Config">
             <db:sql>SELECT * FROM customers WHERE id = :customerId</db:sql>
             <db:input-parameters>
                 <![CDATA[#[{customerId: payload.customerId}]]]>
             </db:input-parameters>
         </db:select>
-        
-        <!-- BUG: Accessing customer.name without null check -->
-        <logger level="INFO" message="Processing payment for customer: #[payload[0].name]"/>
-        
-        <ee:transform>
-            <ee:message>
-                <ee:set-payload resource="dataweave/transform-payment-request.dwl"/>
-            </ee:message>
-        </ee:transform>
+
+        <!-- Fix: db:select returns an array; guard against empty/null results before dereferencing -->
+        <choice>
+            <when expression="#[payload != null and !isEmpty(payload) and payload[0] != null]">
+                <!-- Safe access only after confirming a customer record exists -->
+                <logger level="INFO" message="Processing payment for customer: #[payload[0].name default 'Unknown']"/>
+
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload resource="dataweave/transform-payment-request.dwl"/>
+                    </ee:message>
+                </ee:transform>
+            </when>
+            <otherwise>
+                <!-- Fail fast with a business-safe error when no customer is found -->
+                <raise-error type="VALIDATION:CUSTOMER_NOT_FOUND" description="No customer found for the provided customerId"/>
+            </otherwise>
+        </choice>
     </flow>
 </mule>
