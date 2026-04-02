@@ -6,11 +6,14 @@ output application/json
   customerId: payload.customer.id,
   amount: payload.payment.amount,
   currency: payload.payment.currency,
-  // ❌ BUG: payload.customer.address can be null
-  billingAddress: {
-    street: payload.customer.address.street,
-    city: payload.customer.address.city,
-    zipCode: payload.customer.address.zipCode
-  },
+  // ✅ FIX: Added null checks for payload.customer.address
+  billingAddress: if (payload.customer.address? != null) 
+                  {
+                    street: payload.customer.address.street,
+                    city: payload.customer.address.city,
+                    zipCode: payload.customer.address.zipCode
+                  } 
+                  else 
+                  null,
   timestamp: now()
 }
