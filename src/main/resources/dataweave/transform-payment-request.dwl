@@ -6,11 +6,13 @@ output application/json
   customerId: payload.customer.id,
   amount: payload.payment.amount,
   currency: payload.payment.currency,
-  // ❌ BUG: payload.customer.address can be null
+  // Fix: safely handle a null/missing address object and default fields to null
+  // to prevent NullPointerException while preserving the existing response shape.
   billingAddress: {
-    street: payload.customer.address.street,
-    city: payload.customer.address.city,
-    zipCode: payload.customer.address.zipCode
+    street: payload.customer.address?.street default null,
+    city: payload.customer.address?.city default null,
+    zipCode: payload.customer.address?.zipCode default null
   },
-  timestamp: now()
+  // Fix: explicitly cast to String for a stable JSON representation
+  timestamp: (now() as String)
 }
